@@ -115,7 +115,7 @@ class LogProcessStack(Stack):
         )
         self.glue_database = glue_db_name
 
-        print(glue_database.database_input.name)
+        #print(glue_database.database_input.name)
         glue.CfnCrawler(self, "CfnCrawler",
             role = role.role_arn,
             targets=glue.CfnCrawler.TargetsProperty(
@@ -182,7 +182,43 @@ class LogProcessStack(Stack):
         )
     
     def init_quicksight(self):
-        pass
+        quicksight.CfnDataSource(self, "MyCfnQuickSightDataSource",
+            aws_account_id=self.account,
+            data_source_id="quick-sight-ds1",
+            data_source_parameters=quicksight.CfnDataSource.DataSourceParametersProperty(
+                athena_parameters=quicksight.CfnDataSource.AthenaParametersProperty(
+                    work_group="primary"
+                ),
+            ),
+            name="quick-sight-ds1",
+            type="AMAZON_ATHENA"
+        )
+        quicksight.CfnDataSet(self, "MyCfnDataSet",
+            aws_account_id=self.account,          
+            data_set_id="dataSetId",
+            data_set_usage_configuration=quicksight.CfnDataSet.DataSetUsageConfigurationProperty(
+                disable_use_as_direct_query_source=False,
+                disable_use_as_imported_source=False
+            ),
+            import_mode="SPICE",
+            ingestion_wait_policy=quicksight.CfnDataSet.IngestionWaitPolicyProperty(
+                ingestion_wait_time_in_hours=120,
+                wait_for_spice_ingestion=False
+            ),
+            name="name",
+            physical_table_map={
+                "physical_table_map_key": quicksight.CfnDataSet.PhysicalTableProperty(
+                    relational_table=quicksight.CfnDataSet.RelationalTableProperty(
+                        data_source_arn="dataSourceArn",
+                        input_columns=[quicksight.CfnDataSet.InputColumnProperty(
+                            name="name",
+                            type="type"
+                        )],
+                        name="oliver-apache-agg-bucket"
+                    )
+                )
+            }
+        )
         
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
@@ -206,6 +242,7 @@ class LogProcessStack(Stack):
         self.init_etl_job()
 
         # set up quicksight to visualize the daily respose_cnt by reqonse_code
+        self.init_quicksight()
 
 
 

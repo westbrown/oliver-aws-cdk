@@ -16,6 +16,13 @@ class CdkStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        
+        queue = sqs.Queue(
+            self, "SampleAppQueue",
+            visibility_timeout=Duration.seconds(300),
+        )
 
-        #bucket = s3.Bucket(self, id="MyFirstBucket", bucket_name="my-first-bucket",versioned=True)
+        topic = sns.Topic(
+            self, "SampleAppTopic"
+        )
+
+        topic.add_subscription(subs.SqsSubscription(queue))
