@@ -162,9 +162,27 @@ class LogProcessStack(Stack):
             type = "SCHEDULED",
         
             name="etl_daily_trigger",
-            schedule="Cron(20 10 * * ? *)",
+            schedule="Cron(20 1 * * ? *)",
             start_on_creation=True,
         )
+
+        glue.CfnCrawler(self, "aggCrawler",
+            role = self.glue_role.role_arn,
+            targets=glue.CfnCrawler.TargetsProperty(
+                s3_targets=[glue.CfnCrawler.S3TargetProperty(
+                    path = self.agg_bucket.bucket_name,
+                )]
+            ),
+            database_name=self.glue_database,
+            name="web-agg-log-crawler",
+            schedule=glue.CfnCrawler.ScheduleProperty(
+                schedule_expression="Cron(*/5 * * * ? *)"
+            ),
+            table_prefix=""
+        )
+    
+    def init_quicksight(self):
+        pass
         
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
@@ -186,6 +204,9 @@ class LogProcessStack(Stack):
         self.init_agg_s3()
         # init glue_etl_spark_job to do aggregation and sink result to s3
         self.init_etl_job()
+
+        # set up quicksight to visualize the daily respose_cnt by reqonse_code
+
 
 
 
