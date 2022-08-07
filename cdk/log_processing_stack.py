@@ -152,6 +152,19 @@ class LogProcessStack(Stack):
             timeout=120,
             worker_type="G.1X"
         )
+
+        #add schedule trigger for etl_job
+        glue.CfnTrigger(self, "MyCfnTrigger",
+            actions=[glue.CfnTrigger.ActionProperty(
+                job_name=etl_job.name,
+                timeout=120
+            )],
+            type = "SCHEDULED",
+        
+            name="etl_daily_trigger",
+            schedule="Cron(20 10 * * ? *)",
+            start_on_creation=True,
+        )
         
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
