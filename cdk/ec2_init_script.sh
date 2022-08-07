@@ -8,4 +8,22 @@ sudo systemctl start httpd.service
 # install kinesis-agent
 sudo yum install aws-kinesis-agent -y
 # reconfig kinesis-agent.config
-sudo systemctl start aws-kinesis-agent
+sudo -i 
+echo '{
+  "cloudwatch.emitMetrics": true, 
+  "firehose.endpoint": "firehose.us-east-1.amazonaws.com",
+  
+  "flows": [
+    {
+      "filePattern": "/var/log/httpd/access_log*",
+      "deliveryStream": "web-log-ingestion-stream",
+      "dataProcessingOptions": [
+        {
+          "optionName": "LOGTOJSON",
+          "logFormat": "COMMONAPACHELOG"
+      }]
+    }
+  ]
+}' > /etc/aws-kinesis/agent.json
+chown -R  aws-kinesis-agent-user:aws-kinesis-agent-user /var/log/httpd
+systemctl start aws-kinesis-agent

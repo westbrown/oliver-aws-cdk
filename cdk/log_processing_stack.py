@@ -1,6 +1,8 @@
+from imp import source_from_cache
 from mimetypes import init
 from os import environ
 import os.path
+from unicodedata import name
 from aws_cdk.aws_s3_assets import Asset
 import json
 from aws_cdk import (
@@ -11,6 +13,7 @@ from aws_cdk import (
     aws_athena as athena,
     aws_kinesis as kinesis,
     aws_quicksight as quicksight,
+    aws_kinesisfirehose as firehose,
     App, Stack
 )
 
@@ -70,15 +73,69 @@ class LogProcessStack(Stack):
 
     def init_s3(self):
         self.bucket = s3.Bucket(
-            self, 'myfirstbucket', versioned=False, bucket_name="oliver-apache-bucket")
+            self, 'Myfirstbucket', versioned=False, bucket_name="oliver-apache-bucket")
+
+    def init_kinesis_firehose(self):
+        role = iam.Role(self, "FireHoseRole",assumed_by=iam.ServicePrincipal(
+            "firehose.amazonaws.com"), role_name="log-ingest-role")
+        for policy_item in ["CloudWatchFullAccess", "AmazonKinesisFirehoseFullAccess"]:
+            role.add_managed_policy(
+                iam.ManagedPolicy.from_aws_managed_policy_name(policy_item))
+        self.bucket.grant_read_write(role)
+
+        firehose.CfnDeliveryStream(self, "MyCfnDeliveryStream", 
+            delivery_stream_name = "web-log-ingestion-stream",
+            delivery_stream_type = "DirectPut",
+            s3_destination_configuration=firehose.CfnDeliveryStream.S3DestinationConfigurationProperty(
+                bucket_arn = self.bucket.bucket_arn,
+                role_arn = role.role_arn
+            )
+        )
+
+    def init_glue_crawler(self):
+        role = iam.Role(self, "CrawlerRole", assumed_by=iam.ServicePrincipal("glue.amazonaws.com"),
+            role_name = "log-glue-crawler-role")
+        role.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSGlueServiceRole"))
+        self.bucket.grant_read_write(role)
+
+        glue_db_name = "oliver-db"
+        glue_database = glue.CfnDatabase(self, "MyGlueDb", 
+            catalog_id= self.account,
+            database_input=glue.CfnDatabase.DatabaseInputProperty(
+                name = glue_db_name,
+               # target_database=glue.CfnDatabase.DatabaseIdentifierProperty(
+                #    catalog_id = self.account,
+                #    #database_name=glue_db_name
+                #)
+            )
+        )
+
+        print(glue_database.database_input.name)
+        glue.CfnCrawler(self, "CfnCrawler",
+            role = role.role_arn,
+            targets=glue.CfnCrawler.TargetsProperty(
+                s3_targets=[glue.CfnCrawler.S3TargetProperty(
+                    path = self.bucket.bucket_name,
+                )]
+            ),
+            database_name=glue_db_name,
+            name="web-raw-log-crawler",
+            schedule=glue.CfnCrawler.ScheduleProperty(
+                schedule_expression="Cron(*/5 * * * ? *)"
+            ),
+            table_prefix=""
+        )
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
-
-        
         # vpc
         self.init_vpc()
         # ec2
         self.init_ec2()
         # s3 create for storing apache-log
         self.init_s3()
+        # kinesis firehose
+        self.init_kinesis_firehose()
+
+        # create glue_table
+        self.init_glue_crawler()
