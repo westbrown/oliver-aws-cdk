@@ -16,7 +16,6 @@ from aws_cdk import (
     aws_kinesisfirehose as firehose,
     App, Stack
 )
-
 from constructs import Construct
 dirname = os.path.dirname(__file__)
 
@@ -74,6 +73,10 @@ class LogProcessStack(Stack):
     def init_s3(self):
         self.bucket = s3.Bucket(
             self, 'Myfirstbucket', versioned=False, bucket_name="oliver-apache-bucket")
+    
+    def init_agg_s3(self):
+        self.agg_bucket = s3.Bucket(
+            self, "ResultBucket", bucket_name="oliver-apache-agg-bucket", versioned=False)
 
     def init_kinesis_firehose(self):
         role = iam.Role(self, "FireHoseRole",assumed_by=iam.ServicePrincipal(
@@ -98,6 +101,7 @@ class LogProcessStack(Stack):
         role.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSGlueServiceRole"))
         self.bucket.grant_read_write(role)
 
+        self.glue_role = role
         glue_db_name = "oliver-db"
         glue_database = glue.CfnDatabase(self, "MyGlueDb", 
             catalog_id= self.account,
@@ -109,6 +113,7 @@ class LogProcessStack(Stack):
                 #)
             )
         )
+        self.glue_database = glue_db_name
 
         print(glue_database.database_input.name)
         glue.CfnCrawler(self, "CfnCrawler",
@@ -125,6 +130,29 @@ class LogProcessStack(Stack):
             ),
             table_prefix=""
         )
+    
+    def init_etl_job(self):
+        asset = Asset(self, "CodeAsset", path=os.path.join(
+            dirname, "etl_pyspark.py"))
+        self.glue_role.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name("AmazonS3FullAccess"))
+        etl_job = glue.CfnJob(self, "glueETLJob", 
+            command=glue.CfnJob.JobCommandProperty(
+                name="glueetl",
+                python_version="3",
+                script_location="%s" % asset.s3_object_url
+            ),
+            role=self.glue_role.role_arn,
+            execution_property=glue.CfnJob.ExecutionPropertyProperty(
+                max_concurrent_runs=1
+            ),
+            glue_version = "3.0",
+            max_retries=1,
+            name="glue_etl_job",
+            number_of_workers=5,
+            timeout=120,
+            worker_type="G.1X"
+        )
+        
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -139,3 +167,13 @@ class LogProcessStack(Stack):
 
         # create glue_table
         self.init_glue_crawler()
+
+        # aggregate response_cnt for apache-raw-log group by date, response_code
+        # init agg result bucket
+        self.init_agg_s3()
+        # init glue_etl_spark_job to do aggregation and sink result to s3
+        self.init_etl_job()
+
+
+
+
