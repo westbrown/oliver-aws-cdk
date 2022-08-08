@@ -218,11 +218,27 @@ class LogProcessStack(Stack):
                          columns=[quicksight.CfnDataSet.InputColumnProperty(
                             name="response",
                             type="STRING"
-                        ),],
+                        ),quicksight.CfnDataSet.InputColumnProperty(
+                            name="respCnt",
+                            type="INTEGER"
+                        ),quicksight.CfnDataSet.InputColumnProperty(
+                            name="year",
+                            type="STRING"
+                        ),quicksight.CfnDataSet.InputColumnProperty(
+                            name="month",
+                            type="STRING"
+                        ),quicksight.CfnDataSet.InputColumnProperty(
+                            name="day",
+                            type="STRING"
+                        ),quicksight.CfnDataSet.InputColumnProperty(
+                            name="hour",
+                            type="STRING"
+                        )],
                         data_source_arn=athena_datasource.attr_arn,
                         name="all",
-                        sql_query=f"""SELECT response 
-                                FROM  "oliver-db"."oliver_apache_bucket"
+                        sql_query=f"""SELECT response, "count_host_#0" as respCnt,
+                                partition_0 as year, partition_1 as month, partition_2 as day, partition_3 as hour
+                                FROM  "oliver-db"."oliver_apache_agg_bucket"
                         """
                     )
                 )
