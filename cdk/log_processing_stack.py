@@ -182,42 +182,64 @@ class LogProcessStack(Stack):
         )
     
     def init_quicksight(self):
-        quicksight.CfnDataSource(self, "MyCfnQuickSightDataSource",
+        quicksightUser = "arn:aws:quicksight:us-east-1:%s:user/default/%s" % (self.account, self.account)
+        athena_datasource = quicksight.CfnDataSource(self, "MyCfnQuickSightDataSource",
             aws_account_id=self.account,
-            data_source_id="quick-sight-ds1",
+            data_source_id="log-quick-sight-datasource",
             data_source_parameters=quicksight.CfnDataSource.DataSourceParametersProperty(
                 athena_parameters=quicksight.CfnDataSource.AthenaParametersProperty(
                     work_group="primary"
                 ),
             ),
-            name="quick-sight-ds1",
-            type="AMAZON_ATHENA"
+            name="log-quick-sight-datasource",
+            type="ATHENA",
+            permissions=[quicksight.CfnDataSource.ResourcePermissionProperty(
+                actions=['quicksight:UpdateDataSourcePermissions',
+                    'quicksight:DescribeDataSource',
+                    'quicksight:DescribeDataSourcePermissions',
+                    'quicksight:PassDataSource',
+                    'quicksight:UpdateDataSource',
+                    'quicksight:DeleteDataSource'],
+                principal=quicksightUser
+            )]
         )
         quicksight.CfnDataSet(self, "MyCfnDataSet",
             aws_account_id=self.account,          
-            data_set_id="dataSetId",
+            data_set_id = "log-quick-sight-dataset",
+            name = "log-quick-sight-dataset",
+            import_mode = 'DIRECT_QUERY',
             data_set_usage_configuration=quicksight.CfnDataSet.DataSetUsageConfigurationProperty(
                 disable_use_as_direct_query_source=False,
                 disable_use_as_imported_source=False
             ),
-            import_mode="SPICE",
-            ingestion_wait_policy=quicksight.CfnDataSet.IngestionWaitPolicyProperty(
-                ingestion_wait_time_in_hours=120,
-                wait_for_spice_ingestion=False
-            ),
-            name="name",
             physical_table_map={
-                "physical_table_map_key": quicksight.CfnDataSet.PhysicalTableProperty(
-                    relational_table=quicksight.CfnDataSet.RelationalTableProperty(
-                        data_source_arn="dataSourceArn",
-                        input_columns=[quicksight.CfnDataSet.InputColumnProperty(
-                            name="name",
-                            type="type"
-                        )],
-                        name="oliver-apache-agg-bucket"
+                "athena-titanic-table-sql": quicksight.CfnDataSet.PhysicalTableProperty(
+                    custom_sql=quicksight.CfnDataSet.CustomSqlProperty(
+                         columns=[quicksight.CfnDataSet.InputColumnProperty(
+                            name="response",
+                            type="STRING"
+                        ),],
+                        data_source_arn=athena_datasource.attr_arn,
+                        name="all",
+                        sql_query=f"""SELECT response 
+                                FROM  "oliver-db"."oliver_apache_bucket"
+                        """
                     )
                 )
-            }
+            },
+            permissions=[quicksight.CfnDataSet.ResourcePermissionProperty(
+                actions=['quicksight:UpdateDataSetPermissions',
+                        'quicksight:DescribeDataSet',
+                        'quicksight:DescribeDataSetPermissions',
+                        'quicksight:PassDataSet',
+                        'quicksight:DescribeIngestion',
+                        'quicksight:ListIngestions',
+                        'quicksight:UpdateDataSet',
+                        'quicksight:DeleteDataSet',
+                        'quicksight:CreateIngestion',
+                        'quicksight:CancelIngestion'],
+                principal=quicksightUser
+            )]
         )
         
 
