@@ -64,3 +64,17 @@ def test_glue():
     template.has_resource_properties("AWS::Glue::Crawler", {
         "Name": "web-agg-log-crawler"
     })
+
+def test_quicksight():
+    app = core.App()
+    stack = LogProcessStack(app, "log-stack")
+    template = assertions.Template.from_stack(stack)
+    template.has_resource_properties("AWS::QuickSight::DataSource", {
+        "Name": "log-quick-sight-datasource",
+        "Type": "ATHENA"
+    })
+    template.has_resource_properties("AWS::QuickSight::DataSet", {
+        "ImportMode": "DIRECT_QUERY",
+        "Name": "log-quick-sight-dataset",
+    })
+    
